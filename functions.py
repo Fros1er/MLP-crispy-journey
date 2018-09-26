@@ -4,6 +4,9 @@ from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
 #--algorithms--
 #SVM
 from sklearn.svm import SVC
@@ -26,11 +29,69 @@ from sklearn.ensemble import RandomForestClassifier
 #ETR
 from sklearn.ensemble import ExtraTreesClassifier
 
-import warnings
-warnings.filterwarnings("ignore")
+from warnings import filterwarnings
+filterwarnings("ignore")
 
 #vars
 scoring='accuracy'
+pipelines = {}
+pipelines['ScalerLR'] = Pipeline([('Scaler', StandardScaler()), ('LR', LogisticRegression())])
+pipelines['ScalerLDA'] = Pipeline([('Scaler', StandardScaler()), ('LDA', LinearDiscriminantAnalysis())])
+pipelines['ScalerKNN'] = Pipeline([('Scaler', StandardScaler()), ('KNN', KNeighborsClassifier())])
+pipelines['ScalerNB'] = Pipeline([('Scaler', StandardScaler()), ('NB', GaussianNB())])
+pipelines['ScalerCART'] = Pipeline([('Scaler', StandardScaler()), ('CART', DecisionTreeClassifier())])
+pipelines['ScalerSVM'] = Pipeline([('Scaler', StandardScaler()), ('SVM', SVC())])
+pipelines['ScalerAB'] = Pipeline([('Scaler', StandardScaler()), ('AB', AdaBoostClassifier())])
+pipelines['ScalerGBM'] = Pipeline([('Scaler', StandardScaler()), ('GBM', GradientBoostingClassifier())])
+pipelines['ScalerRFR'] = Pipeline([('Scaler', StandardScaler()), ('RFR', RandomForestClassifier())])
+pipelines['ScalerETR'] = Pipeline([('Scaler', StandardScaler()), ('ETR', ExtraTreesClassifier())])
+
+models = {}
+models['LR'] = LogisticRegression()
+models['LDA'] = LinearDiscriminantAnalysis()
+models['KNN'] = KNeighborsClassifier()
+models['NB'] = GaussianNB()
+models['CART'] = DecisionTreeClassifier()
+models['SVM'] = SVC()
+models['AB'] = AdaBoostClassifier()
+models['GBM'] = GradientBoostingClassifier()
+models['RFR'] = RandomForestClassifier()
+models['ETR'] = ExtraTreesClassifier()
+
+def get_result(model, X_train, Y_train, X_validation, Y_validation):
+    scaler = StandardScaler().fit(X_train)
+    rescaledX = scaler.transform(X_train)
+    model.fit(X=rescaledX, y=Y_train)
+    rescaled_validationX = scaler.transform(X_validation)
+    predictions = model.predict(rescaled_validationX)
+    print(accuracy_score(Y_validation, predictions))
+    print(confusion_matrix(Y_validation, predictions))
+    print(classification_report(Y_validation, predictions))
+    
+def test(X_train, Y_train, num_folds, seed, boxing=False, types='model'):
+    array={}
+    if types == 'scaler':
+        array = pipelines
+    elif types == 'model':
+        array == models
+    kfold = KFold(n_splits=num_folds, random_state=seed)
+    results = []
+    for key in array:
+        result = cross_val_score(array[key], X_train, Y_train, cv=kfold, scoring=scoring)
+        results.append(result)
+        print('%s: mean=%.3f std=%.3f' % (key, result.mean(), result.std()))
+    if boxing:
+        box(results, array)
+
+def GBM_params(X_train, Y_train, num_folds, seed):
+    scaler = StandardScaler().fit(X_train)
+    rescaledX = scaler.transform(X_train)
+    param_grid = {'n_estimators': [10, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900]}
+    model = GradientBoostingClassifier()
+    kfold = KFold(n_splits=num_folds, random_state=seed)
+    grid = GridSearchCV(estimator=model, param_grid=param_grid, scoring=scoring, cv=kfold)
+    grid_result = grid.fit(X=rescaledX, y=Y_train)
+    print('best: %s using %s' % (grid_result.best_score_, grid_result.best_params_))
 
 def KNN_params(X_train, Y_train, num_folds, seed):
     scaler = StandardScaler().fit(X_train)
@@ -41,9 +102,9 @@ def KNN_params(X_train, Y_train, num_folds, seed):
     grid = GridSearchCV(estimator=model, param_grid=param_grid, scoring=scoring, cv=kfold)
     grid_result = grid.fit(X=rescaledX, y=Y_train)
     print('best: %s using %s' % (grid_result.best_score_, grid_result.best_params_))
-    cv_results = zip(grid_result.cv_results_['mean_test_score'], grid_result.cv_results_['std_test_score'], grid_result.cv_results_['params'])
+    '''cv_results = zip(grid_result.cv_results_['mean_test_score'], grid_result.cv_results_['std_test_score'], grid_result.cv_results_['params'])
     for mean, std, param in cv_results:
-        print('mean: %f std: %f with %r' % (mean, std, param))
+        print('mean: %f std: %f with %r' % (mean, std, param))'''
 
 def SVM_params(X_train, Y_train, num_folds, seed):
     scaler = StandardScaler().fit(X_train)
@@ -56,82 +117,9 @@ def SVM_params(X_train, Y_train, num_folds, seed):
     grid = GridSearchCV(estimator=model, param_grid=param_grid, scoring=scoring, cv=kfold)
     grid_result = grid.fit(X=rescaledX, y=Y_train)
     print('best: %s using %s' % (grid_result.best_score_, grid_result.best_params_))
-    cv_results = zip(grid_result.cv_results_['mean_test_score'], grid_result.cv_results_['std_test_score'], grid_result.cv_results_['params'])
+    '''cv_results = zip(grid_result.cv_results_['mean_test_score'], grid_result.cv_results_['std_test_score'], grid_result.cv_results_['params'])
     for mean, std, param in cv_results:
-        print('mean: %f std: %f with %r' % (mean, std, param))
-
-#def GBM_params()
-
-def test_standardscaler(X_train, Y_train, num_folds, seed, boxing=False):
-    pipelines = {}
-    pipelines['ScalerLR'] = Pipeline([('Scaler', StandardScaler()), ('LR', LogisticRegression())])
-    pipelines['ScalerLDA'] = Pipeline([('Scaler', StandardScaler()), ('LDA', LinearDiscriminantAnalysis())])
-    pipelines['ScalerKNN'] = Pipeline([('Scaler', StandardScaler()), ('KNN', KNeighborsClassifier())])
-    pipelines['ScalerNB'] = Pipeline([('Scaler', StandardScaler()), ('NB', GaussianNB())])
-    pipelines['ScalerCART'] = Pipeline([('Scaler', StandardScaler()), ('CART', DecisionTreeClassifier())])
-    pipelines['ScalerSVM'] = Pipeline([('Scaler', StandardScaler()), ('SVM', SVC())])
-    
-    kfold = KFold(n_splits=num_folds, random_state=seed)
-    results = []
-    for key in pipelines:
-        result = cross_val_score(pipelines[key], X_train, Y_train, cv=kfold, scoring=scoring)
-        results.append(result)
-        print('%s: mean=%.3f std=%.3f' % (key, result.mean(), result.std()))
-    print('\n')
-    if boxing:
-        box(results, pipelines)
-
-def test_algorithm(X_train, Y_train, num_folds, seed, boxing=False):
-    model = {}
-    model['LR'] = LogisticRegression()
-    model['LDA'] = LinearDiscriminantAnalysis()
-    model['KNN'] = KNeighborsClassifier()
-    model['NB'] = GaussianNB()
-    model['CART'] = DecisionTreeClassifier()
-    model['SVM'] = SVC()
-
-    kfold = KFold(n_splits=num_folds, random_state=seed)
-    results = []
-    for key in model:
-        result = cross_val_score(model[key], X_train, Y_train, cv=kfold, scoring=scoring)
-        results.append(result)
-        print('%s: mean=%.3f std=%.3f' % (key, result.mean(), result.std()))
-    if boxing:
-        box(results, model)
-
-def test_standardscaler_ensemble(X_train, Y_train, num_folds, seed, boxing=False):
-    pipelines = {}
-    pipelines['ScalerAB'] = Pipeline([('Scaler', StandardScaler()), ('AB', AdaBoostClassifier())])
-    pipelines['ScalerGBM'] = Pipeline([('Scaler', StandardScaler()), ('GBM', GradientBoostingClassifier())])
-    pipelines['ScalerRFR'] = Pipeline([('Scaler', StandardScaler()), ('RFR', RandomForestClassifier())])
-    pipelines['ScalerETR'] = Pipeline([('Scaler', StandardScaler()), ('ETR', ExtraTreesClassifier())])
-
-    kfold = KFold(n_splits=num_folds, random_state=seed)
-    results = []
-    for key in pipelines:
-        result = cross_val_score(pipelines[key], X_train, Y_train, cv=kfold, scoring=scoring)
-        results.append(result)
-        print('%s: mean=%.3f std=%.3f' % (key, result.mean(), result.std()))
-    print('\n')
-    if boxing:
-        box(results, pipelines)
-
-def test_ensemble(X_train, Y_train, num_folds, seed, boxing=False):
-    ensembles = {}
-    ensembles['AB'] = AdaBoostClassifier()
-    ensembles['GBM'] = GradientBoostingClassifier()
-    ensembles['RFR'] = RandomForestClassifier()
-    ensembles['ETR'] = ExtraTreesClassifier()
-
-    kfold = KFold(n_splits=num_folds, random_state=seed)
-    results = []
-    for key in ensembles:
-        result = cross_val_score(ensembles[key], X_train, Y_train, cv=kfold, scoring=scoring)
-        results.append(result)
-        print('%s: mean=%.3f std=%.3f' % (key, result.mean(), result.std()))
-    if boxing:
-        box(results, ensembles)
-
+        print('mean: %f std: %f with %r' % (mean, std, param))'''
 
 #关系矩阵图
 def interface_matrix(a):
